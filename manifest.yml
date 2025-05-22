@@ -1,0 +1,43 @@
+modules:
+  rovo:agent:
+    - key: meeting-follow-up-hello-world-agent
+      name: Meeting Follow-up
+      description: An agent for testing Forge agent functionality
+      prompt: resource:meeting-prompt;meeting-follow-up-prompt.txt
+        
+      conversationStarters:
+        - Summarize meeting notes and create follow-up tasks from a Confluence page
+      actions:
+        - summarize-meeting-notes
+  action:
+    - key: summarize-meeting-notes
+      name: Summarize Meeting Notes
+      function: summarizeMeetingNotes
+      actionVerb: CREATE
+      description: >
+        Summarize meeting notes and create follow up tasks with specific assignee.
+      inputs:
+        meetingNotes:
+          title: Meeting Notes
+          type: string
+          required: true
+          description: |
+            "The meeting notes from the Confluence page"
+      
+  function:
+    - key: summarizeMeetingNotes
+      handler: index.summarizeMeetingNotes
+
+resources: 
+  - key: meeting-prompt
+    path: src
+
+app:
+  runtime:
+    name: nodejs22.x
+  id: ari:cloud:ecosystem::app/dc40f1c0-8c56-461a-a619-9b1a970f9fd8
+
+permissions:
+  scopes:
+    - read:page:confluence
+    - write:jira-work
