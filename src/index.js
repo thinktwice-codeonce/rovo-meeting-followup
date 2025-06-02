@@ -8,7 +8,8 @@ import { getAllContext } from './atlassian-context';
 export const summarizeMeetingNotes = async (payload) => {
   console.log(`Logging message: ${payload.meetingNotes}`);
 
-  const query = `Action items
+  const query = `Extract follow-up tasks from these below details:
+  Action items
     - @Phong Nguyen Schedule another meeting for next week to discuss the business for this quarter. May 30, 2025
     - Prepare a QE and main introduction for the next week's meeting. @Automation Account Jun 10, 2025
     - Coordinate with the finance team to explore the possibility of terminating some employees.  @Automation Account
@@ -36,7 +37,7 @@ export const summarizeMeetingNotes = async (payload) => {
     const model = new ChatAnthropic({
       anthropicApiKey: await getAnthropicApiKey(),
       modelName: 'claude-3-7-sonnet-20250219',
-      temperature: 0.1,  // Set to 0.0-0.3 for most deterministic responses
+      temperature: 0.3,  // Set to 0.0-0.3 for most deterministic responses
       // Add MCP context through system parameters
       system: `You are a highly reliable meeting summarization assistant, specialized in extracting explicit, actionable insights, follow-up tasks, and decisions from meeting notes. 
       Your output is consumed by an automation system to generate Jira tasks and concise meeting summaries.
@@ -44,59 +45,58 @@ export const summarizeMeetingNotes = async (payload) => {
       additionalTools: [{
         type: "mcp",
         mcpContext: payload.context
-      }],
-      topP: 0.1
+      }]
+      // topP: 0.1
     });
 
     // Create a prompt template with explicit instructions to use MCP tools
     const promptTemplate = PromptTemplate.fromTemplate(`
-      You are a fact-only extraction assistant. You help extract action items and follow-up tasks from meeting notes.
-      Your output will be used by an automation system to create Jira tasks and meeting summaries.
+      You are a fact-only extraction assistant. You help extract action items and follow-up tasks from meeting notes. Your output will be used by an automation system to create Jira tasks and meeting summaries.
       ⸻
+      INSTRUCTIONS:
 
-      ### INSTRUCTIONS:
+      Only extract tasks from the Action items section in the meeting content. Use the items listed under the Action items section as the only source of truth for task extraction.
+      For each action item identified, structure your response using the following format:
 
-          1. 	Only extract tasks from the Action items section in the meeting content. Use the items listed under the Action items section as the only source of truth for task extraction.
-
-          2. For each action item identified, structure your response using the following format:
+        {{
+        "action_items": [
           {{
-            "action_items": [
-              {{
-                "task": "Brief description of the task",
-                "owner": "Person responsible (if mentioned)",
-                "due_date": "Due date (if mentioned, in YYYY-MM-DD format)",
-                "priority": "High/Medium/Low (inferred from context)",
-                "context": "Brief context about why this task is needed",
-                "related_topic": "The topic/project this relates to"
-              }}
-            ]
-            "summary": "A concise 2-3 sentence summary of the overall meeting"
+          "task": "Brief description of the task",
+          "owner": "Person responsible (if mentioned)",
+          "due_date": "Due date (if mentioned, in YYYY-MM-DD format)",
+          "priority": "High/Medium/Low (inferred from context)",
+          "context": "Brief context about why this task is needed",
+          "related_topic": "The topic/project this relates to"
           }}
+        ],
+        "summary": "A concise 2-3 sentence summary of the overall meeting"
+        }}
 
       EXTRACTION GUIDELINES:
-        	•	Do not infer or assume information from context or general knowledge.
-          •	Use exact names, dates, and phrasing as written in the Action items section.
-          •	Omit any field that is not explicitly mentioned.
-          •	If a task has no owner, use: "owner": "Unassigned"
-          •	If no due date is mentioned, omit the "due_date" field.
-          •	Do not extract tasks from meeting notes, summaries, or discussion text — only from the Action items section.
+
+      - Extract information only as explicitly stated in the Action items section. Do not infer, assume or hallucinate any information.
+      - Use exact names, dates, and phrasing as written in the Action items section.
+      - Omit any field that is not explicitly mentioned.
+      - If a task has no owner, use: "owner": "Unassigned"
+      - If no due date is mentioned, omit the "due_date" field.
+      - Do not extract tasks from meeting notes, summaries, or discussion text — only from the Action items section.
 
       HANDLING SPECIAL CASES:
-          •	For recurring action items, note the recurrence pattern only if stated.
-          •	For FYI/informational items, exclude them unless they appear under Action items and have a clear task.
-          •	Break multi-part tasks into separate action items if clearly listed as separate.
-          •	If no valid action items are found under the Action items section, return:
-            {{
-              "action_items": [],
-              "summary": "No action items were recorded in this meeting."
-            }}
+
+      - For recurring action items, note the recurrence pattern only if explicitly stated.
+      - For FYI/informational items, exclude them unless they appear under Action items and have a clear task.
+      - Break multi-part tasks into separate action items only if clearly listed as separate tasks.
+      - If no action items are found under the Action items section, return:
+        {{
+        "action_items": [],
+        "summary": "No action items were recorded in this meeting."
+        }}
 
       RESPONSE FORMAT:
-          •	Return only valid JSON output.
-          •	Do not include any commentary, notes, or explanation outside the JSON.
-          •	Ensure the JSON is properly structured and machine-readable.
 
-          `);
+      - Return only valid JSON output.
+      - Do not include any commentary, notes, or explanation outside the JSON.
+      - Ensure the JSON is properly structured and machine-readable.`);
 
     // Create a Langchain pipeline
     const chain = RunnableSequence.from([
