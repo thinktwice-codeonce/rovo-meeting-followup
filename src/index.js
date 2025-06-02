@@ -8,7 +8,12 @@ import { getAllContext } from './atlassian-context';
 export const summarizeMeetingNotes = async (payload) => {
   console.log(`Logging message: ${payload.meetingNotes}`);
 
-  const query = payload.meetingNotes;
+  const query = `Action items
+    - @Phong Nguyen Schedule another meeting for next week to discuss the business for this quarter. May 30, 2025
+    - Prepare a QE and main introduction for the next week's meeting. @Automation Account Jun 10, 2025
+    - Coordinate with the finance team to explore the possibility of terminating some employees.  @Automation Account
+`;
+
   console.log(`INVOKED the summarizeMeetingNotes funtion with the query: ${query} ; Full User input: ${payload}`);
   
   if (!query) {
@@ -24,7 +29,7 @@ export const summarizeMeetingNotes = async (payload) => {
   }
   
   // Get Atlassian context
-  const atlassianContext = await getAllContext(userInput.context);
+  const atlassianContext = await getAllContext(payload.context);
 
   try {
     // Configure Claude model with tools
@@ -33,77 +38,65 @@ export const summarizeMeetingNotes = async (payload) => {
       modelName: 'claude-3-7-sonnet-20250219',
       temperature: 0.1,  // Set to 0.0-0.3 for most deterministic responses
       // Add MCP context through system parameters
-      system: "You are an expert meeting summarization assistant that helps extract actionable insights, decisions, and follow-up tasks from meeting notes. Your output will be used by an automation system to create Jira tasks and meeting summaries.",
+      system: `You are a highly reliable meeting summarization assistant, specialized in extracting explicit, actionable insights, follow-up tasks, and decisions from meeting notes. 
+      Your output is consumed by an automation system to generate Jira tasks and concise meeting summaries.
+      Accuracy is critical: Do not infer, assume, or fabricate information. Extract only what is clearly and explicitly stated in the meeting content.`,
       additionalTools: [{
         type: "mcp",
-        mcpContext: userInput.context
-      }]
+        mcpContext: payload.context
+      }],
+      topP: 0.1
     });
 
     // Create a prompt template with explicit instructions to use MCP tools
     const promptTemplate = PromptTemplate.fromTemplate(`
+      You are a fact-only extraction assistant. You help extract action items and follow-up tasks from meeting notes.
+      Your output will be used by an automation system to create Jira tasks and meeting summaries.
+      ⸻
 
-          You are an expert meeting summarization assistant that helps extract actionable insights, decisions, and follow-up tasks from meeting notes. Your output will be used by an automation system to create Jira tasks and meeting summaries.
+      ### INSTRUCTIONS:
 
-          ### Instructions:
-
-          1. Analyze the provided meeting content thoroughly, focusing on extracting:
-            - Action items and follow-up tasks
-            - Key decisions made
-            - Important discussion points
-            - Unresolved questions or blockers
+          1. 	Only extract tasks from the Action items section in the meeting content. Use the items listed under the Action items section as the only source of truth for task extraction.
 
           2. For each action item identified, structure your response using the following format:
-          {
+          {{
             "action_items": [
-              {
+              {{
                 "task": "Brief description of the task",
                 "owner": "Person responsible (if mentioned)",
                 "due_date": "Due date (if mentioned, in YYYY-MM-DD format)",
                 "priority": "High/Medium/Low (inferred from context)",
                 "context": "Brief context about why this task is needed",
                 "related_topic": "The topic/project this relates to"
-              }
-            ],
-            "decisions": [
-              {
-                "decision": "Brief description of the decision made",
-                "context": "The context or reasoning behind this decision",
-                "stakeholders": "People involved in this decision (if mentioned)"
-              }
-            ],
-            "key_points": [
-              "Important discussion point 1",
-              "Important discussion point 2"
-            ],
-            "open_questions": [
-              "Unresolved question or issue 1",
-              "Unresolved question or issue 2"
-            ],
+              }}
+            ]
             "summary": "A concise 2-3 sentence summary of the overall meeting"
-          }
+          }}
 
-          3. Extraction Guidelines:
-            - Be thorough in identifying all explicit and implicit action items
-            - Use the exact names mentioned for task owners
-            - Infer priority based on language urgency, deadlines, or explicit statements
-            - Maintain the original intent without adding assumptions
-            - If information is ambiguous, note this in your response
-            - Only include fields where information is available (omit empty fields)
+      EXTRACTION GUIDELINES:
+        	•	Do not infer or assume information from context or general knowledge.
+          •	Use exact names, dates, and phrasing as written in the Action items section.
+          •	Omit any field that is not explicitly mentioned.
+          •	If a task has no owner, use: "owner": "Unassigned"
+          •	If no due date is mentioned, omit the "due_date" field.
+          •	Do not extract tasks from meeting notes, summaries, or discussion text — only from the Action items section.
 
-          4. Handling Special Cases:
-            - For recurring action items, note the recurrence pattern if mentioned
-            - For tasks without clear owners, list as "Unassigned"
-            - For items mentioned as "FYI" or informational only, include in key_points rather than action_items
-            - For multi-part tasks, break them into separate action items when appropriate
+      HANDLING SPECIAL CASES:
+          •	For recurring action items, note the recurrence pattern only if stated.
+          •	For FYI/informational items, exclude them unless they appear under Action items and have a clear task.
+          •	Break multi-part tasks into separate action items if clearly listed as separate.
+          •	If no valid action items are found under the Action items section, return:
+            {{
+              "action_items": [],
+              "summary": "No action items were recorded in this meeting."
+            }}
 
-          5. Response Format:
-            - Provide only the structured JSON output without additional commentary
-            - Ensure the JSON is properly formatted and valid
-            - Do not include explanations or notes outside the JSON structure
+      RESPONSE FORMAT:
+          •	Return only valid JSON output.
+          •	Do not include any commentary, notes, or explanation outside the JSON.
+          •	Ensure the JSON is properly structured and machine-readable.
 
-          The meeting content will be provided after this prompt. Analyze it carefully and extract all relevant information according to these guidelines.
-    `);
+          `);
 
     // Create a Langchain pipeline
     const chain = RunnableSequence.from([

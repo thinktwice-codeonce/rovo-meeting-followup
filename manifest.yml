@@ -2,7 +2,7 @@ modules:
   rovo:agent:
     - key: meeting-follow-up-hello-world-agent
       name: Meeting Follow-up
-      description: An agent for testing Forge agent functionality
+      description: An agent for testing Forge agent functionality v3
       prompt: resource:meeting-prompt;meeting-follow-up-prompt.txt
         
       conversationStarters:
@@ -28,7 +28,7 @@ modules:
     - key: summarizeMeetingNotes
       handler: index.summarizeMeetingNotes
 
-resources: 
+resources:
   - key: meeting-prompt
     path: src
 
@@ -39,8 +39,12 @@ app:
 
 permissions:
   scopes:
-    - read:page:confluence
-    - read:content.metadata:confluence
-    - write:jira-work
     - read:jira-work
+    - read:confluence-content.all
+    - read:confluence-content.summary
     - read:jira-user
+  external:
+    fetch:
+      backend:
+        - 'api.anthropic.com'
+        - 'cdn.langchain.com'
