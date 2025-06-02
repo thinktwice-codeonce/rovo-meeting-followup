@@ -39,7 +39,7 @@ export const summarizeMeetingNotes = async (payload) => {
       modelName: 'claude-3-7-sonnet-20250219',
       temperature: 0.3,  // Set to 0.0-0.3 for most deterministic responses
       // Add MCP context through system parameters
-      system: `You are a highly reliable meeting summarization assistant, specialized in extracting explicit, actionable insights, follow-up tasks, and decisions from meeting notes. 
+      system: `You are a highly reliable meeting summarization assistant, specialized in extracting explicit, follow-up tasks (Action items) from meeting notes. 
       Your output is consumed by an automation system to generate Jira tasks and concise meeting summaries.
       Accuracy is critical: Do not infer, assume, or fabricate information. Extract only what is clearly and explicitly stated in the meeting content.`,
       additionalTools: [{
@@ -51,12 +51,11 @@ export const summarizeMeetingNotes = async (payload) => {
 
     // Create a prompt template with explicit instructions to use MCP tools
     const promptTemplate = PromptTemplate.fromTemplate(`
-      You are a fact-only extraction assistant. You help extract action items and follow-up tasks from meeting notes. Your output will be used by an automation system to create Jira tasks and meeting summaries.
+      You are a fact-only extraction assistant. You help extract follow-up tasks (Action items) from meeting notes. Your output will be used by an automation system to create Jira tasks and meeting summaries.
       ⸻
       INSTRUCTIONS:
 
-      Only extract tasks from the Action items section in the meeting content. Use the items listed under the Action items section as the only source of truth for task extraction.
-      For each action item identified, structure your response using the following format:
+      Only extract follow-up tasks (Action items) from the meeting notes. For each action item identified, structure your response using the following format:
 
         {{
         "action_items": [
@@ -73,20 +72,16 @@ export const summarizeMeetingNotes = async (payload) => {
         }}
 
       EXTRACTION GUIDELINES:
-
-      - Extract information only as explicitly stated in the Action items section. Do not infer, assume or hallucinate any information.
-      - Use exact names, dates, and phrasing as written in the Action items section.
-      - Omit any field that is not explicitly mentioned.
-      - If a task has no owner, use: "owner": "Unassigned"
-      - If no due date is mentioned, omit the "due_date" field.
+      - Do not infer, assume, or fabricate information.
+      - If a task has no owner, use: "owner": "Unassigned".
+      - If no due date is mentioned, keep it empty.
       - Do not extract tasks from meeting notes, summaries, or discussion text — only from the Action items section.
 
       HANDLING SPECIAL CASES:
 
       - For recurring action items, note the recurrence pattern only if explicitly stated.
-      - For FYI/informational items, exclude them unless they appear under Action items and have a clear task.
       - Break multi-part tasks into separate action items only if clearly listed as separate tasks.
-      - If no action items are found under the Action items section, return:
+      - If no action items are found, return:
         {{
         "action_items": [],
         "summary": "No action items were recorded in this meeting."
@@ -96,7 +91,15 @@ export const summarizeMeetingNotes = async (payload) => {
 
       - Return only valid JSON output.
       - Do not include any commentary, notes, or explanation outside the JSON.
-      - Ensure the JSON is properly structured and machine-readable.`);
+      - Ensure the JSON is properly structured and machine-readable.
+      
+      ## Atlassian Context
+      {atlassianContext}
+    
+      ## User Query
+      {query}
+      
+      `);
 
     // Create a Langchain pipeline
     const chain = RunnableSequence.from([
@@ -110,7 +113,7 @@ export const summarizeMeetingNotes = async (payload) => {
       query: query,
       atlassianContext: atlassianContext
     });
-    console.log(`FINAL RESPONSE => 2: ${response}`);
+    console.log(`FINAL RESPONSE => 3: ${response}`);
 
     // Process the response to extract just the color and row number
     const processedResponse = response.trim();

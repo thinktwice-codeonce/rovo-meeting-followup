@@ -2,7 +2,7 @@ modules:
   rovo:agent:
     - key: meeting-follow-up-hello-world-agent
       name: Meeting Follow-up
-      description: An agent for testing Forge agent functionality v3
+      description: An agent for testing Forge agent functionality
       prompt: resource:meeting-prompt;meeting-follow-up-prompt.txt
         
       conversationStarters:
