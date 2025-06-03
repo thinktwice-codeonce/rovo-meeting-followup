@@ -115,7 +115,6 @@ export const createFollowUpIssues = async (payload) => {
     // Process the response to extract just the color and row number
     const processedResponse = response.trim();
     const createdJiraLinks = await createJiraTasks(processedResponse);
-    const jiraResult = await createJiraTasks(processedResponse);
 
     // Return the response to the Rovo agent
     console.log(`FINAL RESPONSE => UPDATED: ${createdJiraLinks}`);
