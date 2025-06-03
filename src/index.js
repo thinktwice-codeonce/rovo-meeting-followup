@@ -6,7 +6,7 @@ import { RunnableSequence } from '@langchain/core/runnables';
 import { getAllContext } from './atlassian-context';
 import { fetchPageOrBlogInfo, resourceTypeToContentType, updatePageOrBlogContent } from './confluenceUtil';
 
-export const summarizeMeetingNotes = async (payload) => {
+export const createFollowUpIssues = async (payload) => {
   console.log(`Confluence Page ID: ${payload.pageId}`);
   const pageContent = await fetchPageContent(payload.pageId);
 
@@ -110,22 +110,15 @@ export const summarizeMeetingNotes = async (payload) => {
       query: query,
       atlassianContext: atlassianContext
     });
-    console.log(`FINAL RESPONSE => 3: ${response}`);
 
     // Process the response to extract just the color and row number
     const processedResponse = response.trim();
-    createJiraTasks(processedResponse);
+    const createdJiraLinks = await createJiraTasks(processedResponse);
 
     // Return the response to the Rovo agent
-    return {
-      response: {
-        type: 'message',
-        body: {
-          type: 'text',
-          text: processedResponse
-        }
-      }
-    };
+    console.log(`FINAL RESPONSE => UPDATED: ${createdJiraLinks}`);
+
+    return createdJiraLinks;
   } catch (error) {
     console.error('Error processing query:', error);
     
@@ -172,10 +165,33 @@ console.log(actionItems);
 
 //TODO: Generate Jira tasks from actionItems (api.asUser().requestJira)
 
-// Access individual items
-actionItems.forEach(item => {
-  console.log(`${item.owner} needs to: ${item.task}`);
+const createdJiraTasksTemp = `{
+    "issues": [
+        {
+            "id": "66762",
+            "key": "MC-63",
+            "self": "https://nhct-demo.atlassian.net/rest/api/3/issue/66762"
+        },
+        {
+            "id": "66763",
+            "key": "MC-64",
+            "self": "https://nhct-demo.atlassian.net/rest/api/3/issue/66763"
+        }
+    ],
+    "errors": []
+}`;
+const createdJiraTasks = JSON.parse(createdJiraTasksTemp)
+const issueLinks = createdJiraTasks.issues.map(issue => {
+  // Extract base URL from the "self" field
+  const url = new URL(issue.self);
+  const baseUrl = `${url.protocol}//${url.host}`;
+  // Construct the Jira issue link
+  return `${baseUrl}/browse/${issue.key}`;
 });
+
+// Example output: ["https://nhct-demo.atlassian.net/browse/MC-63", ...]
+console.log(`Created Jira tasks: ${issueLinks.join(', ')}`);
+return issueLinks;
 } catch (error) {
   console.error("Invalid JSON:", error.message);
 }
