@@ -15,14 +15,14 @@ modules:
       function: summarizeMeetingNotes
       actionVerb: CREATE
       description: >
-        Summarize meeting notes and create follow up tasks with specific assignee.
+        Summarize meeting notes and create follow up tasks (Action items) with specific assignee, due date and priority.
       inputs:
-        meetingNotes:
-          title: Meeting Notes
+        pageId:
+          title: Confluence Page ID
           type: string
           required: true
           description: |
-            "The meeting notes from the Confluence page"
+            "The page ID from the Confluence page"
       
   function:
     - key: summarizeMeetingNotes
@@ -42,6 +42,8 @@ permissions:
     - read:jira-work
     - read:confluence-content.all
     - read:confluence-content.summary
+    - read:content.metadata:confluence
+    - read:page:confluence
     - read:jira-user
   external:
     fetch:

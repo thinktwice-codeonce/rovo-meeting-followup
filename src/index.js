@@ -4,18 +4,15 @@ import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableSequence } from '@langchain/core/runnables';
 import { getAllContext } from './atlassian-context';
+import { fetchPageOrBlogInfo, resourceTypeToContentType, updatePageOrBlogContent } from './confluenceUtil';
 
 export const summarizeMeetingNotes = async (payload) => {
-  console.log(`Logging message: ${payload.meetingNotes}`);
+  console.log(`Confluence Page ID: ${payload.pageId}`);
+  const pageContent = await fetchPageContent(payload.pageId);
 
-  const query = `Extract follow-up tasks from these below details:
-  Action items
-    - @Phong Nguyen Schedule another meeting for next week to discuss the business for this quarter. May 30, 2025
-    - Prepare a QE and main introduction for the next week's meeting. @Automation Account Jun 10, 2025
-    - Coordinate with the finance team to explore the possibility of terminating some employees.  @Automation Account
-`;
+  const query = pageContent;
 
-  console.log(`INVOKED the summarizeMeetingNotes funtion with the query: ${query} ; Full User input: ${payload}`);
+  console.log(`INVOKED the summarizeMeetingNotes funtion with the query: ${query} ; Full User input: ${JSON.stringify(payload)}`);
   
   if (!query) {
     return {
@@ -60,8 +57,8 @@ export const summarizeMeetingNotes = async (payload) => {
         {{
         "action_items": [
           {{
-          "task": "Brief description of the task",
-          "owner": "Person responsible (if mentioned)",
+          "task": "<Brief description of the task>",
+          "owner": "<data-account-id>",
           "due_date": "Due date (if mentioned, in YYYY-MM-DD format)",
           "priority": "High/Medium/Low (inferred from context)",
           "context": "Brief context about why this task is needed",
@@ -117,6 +114,7 @@ export const summarizeMeetingNotes = async (payload) => {
 
     // Process the response to extract just the color and row number
     const processedResponse = response.trim();
+    createJiraTasks(processedResponse);
 
     // Return the response to the Rovo agent
     return {
@@ -152,5 +150,34 @@ async function getAnthropicApiKey() {
   }
   
   return apiKey;
+}
+
+export const fetchPageContent = async (pageId) => {
+  const pageInfo = await fetchPageOrBlogInfo(pageId, 'page', 'view');
+  return pageInfo.content;
+}
+
+export const createJiraTasks = async (rawJsonContent) => {
+  try {
+  // Remove code fences like ```json, ```html, ```code, or ```
+  const cleanJsonContent = rawJsonContent
+  .replace(/```[\w-]*\n?/gi, '')  // Remove opening fence with optional label
+  .replace(/```/g, '')            // Remove closing fence
+  .trim();
+  const meetingContent = JSON.parse(cleanJsonContent);
+  console.log(meetingContent);
+  // Access the action_items array
+const actionItems = meetingContent.action_items;
+console.log(actionItems);
+
+//TODO: Generate Jira tasks from actionItems (api.asUser().requestJira)
+
+// Access individual items
+actionItems.forEach(item => {
+  console.log(`${item.owner} needs to: ${item.task}`);
+});
+} catch (error) {
+  console.error("Invalid JSON:", error.message);
+}
 }
 
