@@ -1,41 +1,12 @@
 import api, { route } from '@forge/api';
 
-// fetch priority id from Jira
-export const fetchJiraPriorityId = async (priority) => {
-  try {
-    const response = await api.asApp().requestJira(route`/rest/api/3/priority`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch priorities: ${response.status} ${response.statusText}`);
-    }
-
-    const priorities = await response.json();
-    const priorityObj = priorities.find(p => p.name.toLowerCase() === priority.toLowerCase());
-    
-    if (!priorityObj) {
-      console.warn(`Priority "${priority}" not found in Jira. Using default priority.`);
-      return null;
-    }
-    
-    return priorityObj.id;
-  } catch (error) {
-    console.error('Error fetching Jira priority ID:', error);
-    return null;
-  }
-}
-
 /**
  * Function 1: Fetch available priority data and map to find the corresponding id
  * @returns {Object} A mapping object where keys are priority names and values are priority IDs
  */
 export const fetchJiraPriorityMapping = async () => {
   try {
-    const response = await api.asUser().requestJira('/rest/api/3/priority', {
+    const response = await api.asUser().requestJira(route`/rest/api/3/priority`, {
       headers: {
         'Accept': 'application/json'
       }
@@ -84,7 +55,7 @@ export const fetchJiraPriorityMapping = async () => {
  * @param {string} issueTypeId - Jira issue type ID (default: "10002" for Task)
  * @returns {Object} Response from Jira bulk create API
  */
-export const bulkCreateJiraIssues = async (actionItems, projectId = "10102", issueTypeId = "10002") => {
+export const bulkCreateJiraIssues = async (actionItems, projectId, issueTypeId) => {
   try {
     // Get priority mapping for all action items
     const priorityMapping = await fetchJiraPriorityMapping();
@@ -167,7 +138,7 @@ export const bulkCreateJiraIssues = async (actionItems, projectId = "10102", iss
     console.log('Bulk create request body:', JSON.stringify(bodyData, null, 2));
 
     // Make the bulk create request
-    const response = await api.asUser().requestJira('/rest/api/3/issue/bulk', {
+    const response = await api.asUser().requestJira(route`/rest/api/3/issue/bulk`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',

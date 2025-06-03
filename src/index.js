@@ -180,7 +180,9 @@ export const createJiraTasks = async (rawJsonContent) => {
     }
 
     // Create Jira issues from action items
-    const jiraResult = await bulkCreateJiraIssues(actionItems);
+    const projectId = process.env.JIRA_PROJECT_ID || "10010"; // MOBL
+    const issueTypeId = process.env.JIRA_ISSUE_TYPE_ID || "10002"; // Task
+    const jiraResult = await bulkCreateJiraIssues(actionItems, projectId, issueTypeId);
     
     console.log('Jira bulk create result:', jiraResult);
 
