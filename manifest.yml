@@ -6,7 +6,8 @@ modules:
       prompt: resource:meeting-prompt;meeting-follow-up-prompt.txt
         
       conversationStarters:
-        - Summarize meeting notes and create follow-up tasks from a Confluence page
+        - Summarize meeting notes and create follow-up tasks from a Confluence
+          page
       actions:
         - summarize-meeting-notes
   action:
@@ -15,7 +16,8 @@ modules:
       function: summarizeMeetingNotes
       actionVerb: CREATE
       description: >
-        Summarize meeting notes and create follow up tasks (Action items) with specific assignee, due date and priority.
+        Summarize meeting notes and create follow up tasks (Action items) with
+        specific assignee, due date and priority.
       inputs:
         pageId:
           title: Confluence Page ID
@@ -31,6 +33,8 @@ modules:
 resources:
   - key: meeting-prompt
     path: src
+    tunnel:
+      port: 9229
 
 app:
   runtime:
@@ -39,6 +43,7 @@ app:
 
 permissions:
   scopes:
+    - write:jira-work
     - read:jira-work
     - read:confluence-content.all
     - read:confluence-content.summary
@@ -48,5 +53,5 @@ permissions:
   external:
     fetch:
       backend:
-        - 'api.anthropic.com'
-        - 'cdn.langchain.com'
+        - api.anthropic.com
+        - cdn.langchain.com
