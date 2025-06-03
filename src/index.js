@@ -5,6 +5,7 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableSequence } from '@langchain/core/runnables';
 import { getAllContext } from './atlassian-context';
 import { fetchPageOrBlogInfo, resourceTypeToContentType, updatePageOrBlogContent } from './confluenceUtil';
+import { bulkCreateJiraIssues } from './jiraUtil';
 
 export const createFollowUpIssues = async (payload) => {
   console.log(`Confluence Page ID: ${payload.pageId}`);
@@ -114,6 +115,7 @@ export const createFollowUpIssues = async (payload) => {
     // Process the response to extract just the color and row number
     const processedResponse = response.trim();
     const createdJiraLinks = await createJiraTasks(processedResponse);
+    const jiraResult = await createJiraTasks(processedResponse);
 
     // Return the response to the Rovo agent
     console.log(`FINAL RESPONSE => UPDATED: ${createdJiraLinks}`);
@@ -152,48 +154,49 @@ export const fetchPageContent = async (pageId) => {
 
 export const createJiraTasks = async (rawJsonContent) => {
   try {
-  // Remove code fences like ```json, ```html, ```code, or ```
-  const cleanJsonContent = rawJsonContent
-  .replace(/```[\w-]*\n?/gi, '')  // Remove opening fence with optional label
-  .replace(/```/g, '')            // Remove closing fence
-  .trim();
-  const meetingContent = JSON.parse(cleanJsonContent);
-  console.log(meetingContent);
-  // Access the action_items array
-const actionItems = meetingContent.action_items;
-console.log(actionItems);
+    // Remove code fences like ```json, ```html, ```code, or ```
+    const cleanJsonContent = rawJsonContent
+      .replace(/```[\w-]*\n?/gi, '')  // Remove opening fence with optional label
+      .replace(/```/g, '')            // Remove closing fence
+      .trim();
+    
+    const meetingContent = JSON.parse(cleanJsonContent);
+    console.log('Parsed meeting content:', meetingContent);
+    
+    // Access the action_items array
+    const actionItems = meetingContent.action_items;
+    console.log('Action items to process:', actionItems);
 
-//TODO: Generate Jira tasks from actionItems (api.asUser().requestJira)
+    // Check if there are any action items to process
+    if (!actionItems || actionItems.length === 0) {
+      console.log('No action items found to create Jira tasks');
+      return;
+    }
 
-const createdJiraTasksTemp = `{
-    "issues": [
-        {
-            "id": "66762",
-            "key": "MC-63",
-            "self": "https://nhct-demo.atlassian.net/rest/api/3/issue/66762"
-        },
-        {
-            "id": "66763",
-            "key": "MC-64",
-            "self": "https://nhct-demo.atlassian.net/rest/api/3/issue/66763"
-        }
-    ],
-    "errors": []
-}`;
-const createdJiraTasks = JSON.parse(createdJiraTasksTemp)
-const issueLinks = createdJiraTasks.issues.map(issue => {
-  // Extract base URL from the "self" field
-  const url = new URL(issue.self);
-  const baseUrl = `${url.protocol}//${url.host}`;
-  // Construct the Jira issue link
-  return `${baseUrl}/browse/${issue.key}`;
-});
+    // Create Jira issues from action items
+    const projectId = process.env.JIRA_PROJECT_ID || "10010"; // MOBL
+    const issueTypeId = process.env.JIRA_ISSUE_TYPE_ID || "10002"; // Task
+    const jiraResult = await bulkCreateJiraIssues(actionItems, projectId, issueTypeId);
+    
+    console.log('Jira bulk create result:', jiraResult);
 
-// Example output: ["https://nhct-demo.atlassian.net/browse/MC-63", ...]
-console.log(`Created Jira tasks: ${issueLinks.join(', ')}`);
-return issueLinks;
-} catch (error) {
-  console.error("Invalid JSON:", error.message);
-}
+    // Log success for each created issue
+    if (jiraResult.issues) {
+      jiraResult.issues.forEach((issue, index) => {
+        console.log(`Created Jira issue: ${issue.key} (${issue.id}) for action item: "${actionItems[index].task}"`);
+      });
+    }
+
+    // Log any errors
+    if (jiraResult.errors && jiraResult.errors.length > 0) {
+      console.error('Some issues had errors during creation:', jiraResult.errors);
+    }
+
+    return jiraResult;
+  } catch (error) {
+    console.error("Error creating Jira tasks:", error.message);
+    console.error("Stack trace:", error.stack);
+    throw error; // Re-throw to let calling function handle it
+  }
 }
 

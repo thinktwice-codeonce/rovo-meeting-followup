@@ -32,6 +32,8 @@ modules:
 resources:
   - key: meeting-prompt
     path: src
+    tunnel:
+      port: 9229
 
 app:
   runtime:
@@ -40,6 +42,7 @@ app:
 
 permissions:
   scopes:
+    - write:jira-work
     - read:jira-work
     - read:confluence-content.all
     - read:confluence-content.summary
@@ -49,5 +52,5 @@ permissions:
   external:
     fetch:
       backend:
-        - 'api.anthropic.com'
-        - 'cdn.langchain.com'
+        - api.anthropic.com
+        - cdn.langchain.com
