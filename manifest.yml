@@ -6,7 +6,7 @@ modules:
       prompt: resource:meeting-prompt;meeting-follow-up-prompt.txt
         
       conversationStarters:
-        - Create follow-up Jira issues from a Confluence page
+        - Create follow-up Jira tasks from meeting notes on a Confluence page
       actions:
         - create-follow-up-issues
   action:

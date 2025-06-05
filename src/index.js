@@ -173,25 +173,28 @@ export const createJiraTasks = async (rawJsonContent) => {
     }
 
     // Create Jira issues from action items
-    const projectId = process.env.JIRA_PROJECT_ID || "10010"; // MOBL
+    const projectId = process.env.JIRA_PROJECT_ID || "10010"; // MOBL project ID
     const issueTypeId = process.env.JIRA_ISSUE_TYPE_ID || "10002"; // Task
     const jiraResult = await bulkCreateJiraIssues(actionItems, projectId, issueTypeId);
     
     console.log('Jira bulk create result:', jiraResult);
 
-    // Log success for each created issue
-    if (jiraResult.issues) {
-      jiraResult.issues.forEach((issue, index) => {
-        console.log(`Created Jira issue: ${issue.key} (${issue.id}) for action item: "${actionItems[index].task}"`);
-      });
-    }
+    const siteInfo = await api.asUser().requestJira(route`/rest/api/3/serverInfo`);
+    const baseUrl = (await siteInfo.json()).baseUrl;
+    console.log(`BaseURL of the site: ${baseUrl}`); // Logs the API route path
+    const issueLinks = jiraResult.issues.map(issue => {
+      // Construct the Jira issue link
+      return `${baseUrl}/browse/${issue.key}`;
+    });   
+
+    console.log(`Created Jira issue links: ${issueLinks.join(', ')}`);
 
     // Log any errors
     if (jiraResult.errors && jiraResult.errors.length > 0) {
       console.error('Some issues had errors during creation:', jiraResult.errors);
     }
 
-    return jiraResult;
+    return issueLinks;
   } catch (error) {
     console.error("Error creating Jira tasks:", error.message);
     console.error("Stack trace:", error.stack);

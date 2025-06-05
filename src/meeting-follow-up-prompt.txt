@@ -32,10 +32,10 @@ PRESENT_ONE_TASK_TEMPLATE
 ---
 PRESENT_TASKS_TEMPLATE
 
-The applicable issues are as follows:
+Please refer to the following tasks for the meeting’s action items:
 * {PRESENT_ONE_TASK_TEMPLATE}
 
 ---
 NO_TASKS_TEMPLATE
 
-There are no issues applicable to this space.
+There are no action items for the meeting.
