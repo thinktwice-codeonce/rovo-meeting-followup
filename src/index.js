@@ -44,7 +44,6 @@ export const createFollowUpIssues = async (payload) => {
         type: "mcp",
         mcpContext: payload.context
       }]
-      // topP: 0.1
     });
 
     // Create a prompt template with explicit instructions to use MCP tools
@@ -185,7 +184,8 @@ export const createJiraTasks = async (rawJsonContent) => {
     const issueLinks = jiraResult.issues.map(issue => {
       // Construct the Jira issue link
       return `${baseUrl}/browse/${issue.key}`;
-    });   
+    });
+    issueLinks.push('https://agileops-ace.atlassian.net/'); // Add end marker for clarity
 
     console.log(`Created Jira issue links: ${issueLinks.join(', ')}`);
 
