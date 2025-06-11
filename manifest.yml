@@ -1,21 +1,22 @@
 modules:
   rovo:agent:
-    - key: meeting-follow-up-hello-world-agent
+    - key: meeting-follow-up
       name: Meeting Follow-up
-      description: An agent for testing Forge agent functionality
+      description: An agent for testing Forge agent functionality v2.6
       prompt: resource:meeting-prompt;meeting-follow-up-prompt.txt
         
       conversationStarters:
-        - Summarize meeting notes and create follow-up tasks from a Confluence page
+        - Create follow-up Jira tasks from meeting notes on a Confluence page
       actions:
-        - summarize-meeting-notes
+        - create-follow-up-issues
   action:
-    - key: summarize-meeting-notes
-      name: Summarize Meeting Notes
-      function: summarizeMeetingNotes
-      actionVerb: CREATE
+    - key: create-follow-up-issues
+      name: Create Follow-up Jira Issues
+      function: createFollowUpIssues
+      actionVerb: GET
       description: >
-        Summarize meeting notes and create follow up tasks (Action items) with specific assignee, due date and priority.
+        This action retrieves links applicable to a given meeting notes. The links is 
+        retuned as an array of strings where each string represents a single link.
       inputs:
         pageId:
           title: Confluence Page ID
@@ -25,12 +26,14 @@ modules:
             "The page ID from the Confluence page"
       
   function:
-    - key: summarizeMeetingNotes
-      handler: index.summarizeMeetingNotes
+    - key: createFollowUpIssues
+      handler: index.createFollowUpIssues
 
 resources:
   - key: meeting-prompt
     path: src
+    tunnel:
+      port: 9229
 
 app:
   runtime:
@@ -39,6 +42,7 @@ app:
 
 permissions:
   scopes:
+    - write:jira-work
     - read:jira-work
     - read:confluence-content.all
     - read:confluence-content.summary
@@ -48,5 +52,5 @@ permissions:
   external:
     fetch:
       backend:
-        - 'api.anthropic.com'
-        - 'cdn.langchain.com'
+        - api.anthropic.com
+        - cdn.langchain.com

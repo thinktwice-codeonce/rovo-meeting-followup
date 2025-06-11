@@ -5,8 +5,9 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableSequence } from '@langchain/core/runnables';
 import { getAllContext } from './atlassian-context';
 import { fetchPageOrBlogInfo, resourceTypeToContentType, updatePageOrBlogContent } from './confluenceUtil';
+import { bulkCreateJiraIssues } from './jiraUtil';
 
-export const summarizeMeetingNotes = async (payload) => {
+export const createFollowUpIssues = async (payload) => {
   console.log(`Confluence Page ID: ${payload.pageId}`);
   const pageContent = await fetchPageContent(payload.pageId);
 
@@ -26,15 +27,15 @@ export const summarizeMeetingNotes = async (payload) => {
     };
   }
   
-  // Get Atlassian context
+  // GET ATLASSIAN CONTEXT
   const atlassianContext = await getAllContext(payload.context);
 
   try {
-    // Configure Claude model with tools
+    // CONFIGURE CLAUDE MODEL WITH MCP CONTEXT/TOOLS
     const model = new ChatAnthropic({
       anthropicApiKey: await getAnthropicApiKey(),
       modelName: 'claude-3-7-sonnet-20250219',
-      temperature: 0.3,  // Set to 0.0-0.3 for most deterministic responses
+      temperature: 0.1,  // Set to 0.0-0.3 for most deterministic responses
       // Add MCP context through system parameters
       system: `You are a highly reliable meeting summarization assistant, specialized in extracting explicit, follow-up tasks (Action items) from meeting notes. 
       Your output is consumed by an automation system to generate Jira tasks and concise meeting summaries.
@@ -43,10 +44,9 @@ export const summarizeMeetingNotes = async (payload) => {
         type: "mcp",
         mcpContext: payload.context
       }]
-      // topP: 0.1
     });
 
-    // Create a prompt template with explicit instructions to use MCP tools
+    // Create a PROMPT TEMPLATE with explicit instructions to use MCP tools
     const promptTemplate = PromptTemplate.fromTemplate(`
       You are a fact-only extraction assistant. You help extract follow-up tasks (Action items) from meeting notes. Your output will be used by an automation system to create Jira tasks and meeting summaries.
       ⸻
@@ -105,27 +105,20 @@ export const summarizeMeetingNotes = async (payload) => {
       new StringOutputParser(),
     ]);
 
-    // Execute the chain with context
+    // EXECUTE THE CHAIN with context
     const response = await chain.invoke({
       query: query,
       atlassianContext: atlassianContext
     });
-    console.log(`FINAL RESPONSE => 3: ${response}`);
 
-    // Process the response to extract just the color and row number
+    // PROCESS THE RESPONSE to extract
     const processedResponse = response.trim();
-    createJiraTasks(processedResponse);
+    const createdJiraLinks = await createJiraTasks(processedResponse);
 
     // Return the response to the Rovo agent
-    return {
-      response: {
-        type: 'message',
-        body: {
-          type: 'text',
-          text: processedResponse
-        }
-      }
-    };
+    console.log(`FINAL RESPONSE => UPDATED: ${createdJiraLinks}`);
+
+    return createdJiraLinks;
   } catch (error) {
     console.error('Error processing query:', error);
     
@@ -159,25 +152,52 @@ export const fetchPageContent = async (pageId) => {
 
 export const createJiraTasks = async (rawJsonContent) => {
   try {
-  // Remove code fences like ```json, ```html, ```code, or ```
-  const cleanJsonContent = rawJsonContent
-  .replace(/```[\w-]*\n?/gi, '')  // Remove opening fence with optional label
-  .replace(/```/g, '')            // Remove closing fence
-  .trim();
-  const meetingContent = JSON.parse(cleanJsonContent);
-  console.log(meetingContent);
-  // Access the action_items array
-const actionItems = meetingContent.action_items;
-console.log(actionItems);
+    // Remove code fences like ```json, ```html, ```code, or ```
+    const cleanJsonContent = rawJsonContent
+      .replace(/```[\w-]*\n?/gi, '')  // Remove opening fence with optional label
+      .replace(/```/g, '')            // Remove closing fence
+      .trim();
+    
+    const meetingContent = JSON.parse(cleanJsonContent);
+    console.log('Parsed meeting content:', meetingContent);
+    
+    // Access the action_items array
+    const actionItems = meetingContent.action_items;
+    console.log('Action items to process:', actionItems);
 
-//TODO: Generate Jira tasks from actionItems (api.asUser().requestJira)
+    // Check if there are any action items to process
+    if (!actionItems || actionItems.length === 0) {
+      console.log('No action items found to create Jira tasks');
+      return;
+    }
 
-// Access individual items
-actionItems.forEach(item => {
-  console.log(`${item.owner} needs to: ${item.task}`);
-});
-} catch (error) {
-  console.error("Invalid JSON:", error.message);
-}
+    // Create Jira issues from action items
+    const projectId = process.env.JIRA_PROJECT_ID || "10010"; // MOBL project ID
+    const issueTypeId = process.env.JIRA_ISSUE_TYPE_ID || "10002"; // Task
+    const jiraResult = await bulkCreateJiraIssues(actionItems, projectId, issueTypeId);
+    
+    console.log('Jira bulk create result:', jiraResult);
+
+    const siteInfo = await api.asUser().requestJira(route`/rest/api/3/serverInfo`);
+    const baseUrl = (await siteInfo.json()).baseUrl;
+    console.log(`BaseURL of the site: ${baseUrl}`); // Logs the API route path
+    const issueLinks = jiraResult.issues.map(issue => {
+      // Construct the Jira issue link
+      return `${baseUrl}/browse/${issue.key}`;
+    });
+
+    console.log(`Created Jira issue links: ${issueLinks.join(', ')}`);
+
+    // Log any errors
+    if (jiraResult.errors && jiraResult.errors.length > 0) {
+      console.error('Some issues had errors during creation:', jiraResult.errors);
+    }
+
+    return issueLinks;
+  } catch (error) {
+    console.error("Error creating Jira tasks:", error.message);
+    console.error("Stack trace:", error.stack);
+    throw error; // Re-throw to let calling function handle it
+  }
 }
 
