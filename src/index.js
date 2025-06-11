@@ -27,15 +27,15 @@ export const createFollowUpIssues = async (payload) => {
     };
   }
   
-  // Get Atlassian context
+  // GET ATLASSIAN CONTEXT
   const atlassianContext = await getAllContext(payload.context);
 
   try {
-    // Configure Claude model with tools
+    // CONFIGURE CLAUDE MODEL WITH MCP CONTEXT/TOOLS
     const model = new ChatAnthropic({
       anthropicApiKey: await getAnthropicApiKey(),
       modelName: 'claude-3-7-sonnet-20250219',
-      temperature: 0.3,  // Set to 0.0-0.3 for most deterministic responses
+      temperature: 0.1,  // Set to 0.0-0.3 for most deterministic responses
       // Add MCP context through system parameters
       system: `You are a highly reliable meeting summarization assistant, specialized in extracting explicit, follow-up tasks (Action items) from meeting notes. 
       Your output is consumed by an automation system to generate Jira tasks and concise meeting summaries.
@@ -46,7 +46,7 @@ export const createFollowUpIssues = async (payload) => {
       }]
     });
 
-    // Create a prompt template with explicit instructions to use MCP tools
+    // Create a PROMPT TEMPLATE with explicit instructions to use MCP tools
     const promptTemplate = PromptTemplate.fromTemplate(`
       You are a fact-only extraction assistant. You help extract follow-up tasks (Action items) from meeting notes. Your output will be used by an automation system to create Jira tasks and meeting summaries.
       ⸻
@@ -105,13 +105,13 @@ export const createFollowUpIssues = async (payload) => {
       new StringOutputParser(),
     ]);
 
-    // Execute the chain with context
+    // EXECUTE THE CHAIN with context
     const response = await chain.invoke({
       query: query,
       atlassianContext: atlassianContext
     });
 
-    // Process the response to extract just the color and row number
+    // PROCESS THE RESPONSE to extract
     const processedResponse = response.trim();
     const createdJiraLinks = await createJiraTasks(processedResponse);
 
@@ -185,7 +185,6 @@ export const createJiraTasks = async (rawJsonContent) => {
       // Construct the Jira issue link
       return `${baseUrl}/browse/${issue.key}`;
     });
-    issueLinks.push('https://agileops-ace.atlassian.net/'); // Add end marker for clarity
 
     console.log(`Created Jira issue links: ${issueLinks.join(', ')}`);
 

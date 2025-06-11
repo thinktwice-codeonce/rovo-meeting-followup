@@ -2,7 +2,7 @@ modules:
   rovo:agent:
     - key: meeting-follow-up
       name: Meeting Follow-up
-      description: An agent for testing Forge agent functionality v2.5
+      description: An agent for testing Forge agent functionality v2.6
       prompt: resource:meeting-prompt;meeting-follow-up-prompt.txt
         
       conversationStarters:
