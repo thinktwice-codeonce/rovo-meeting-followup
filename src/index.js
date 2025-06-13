@@ -8,8 +8,9 @@ import { fetchPageOrBlogInfo, resourceTypeToContentType, updatePageOrBlogContent
 import { bulkCreateJiraIssues } from './jiraUtil';
 
 export const createFollowUpIssues = async (payload) => {
-  console.log(`Confluence Page ID: ${payload.pageId}`);
-  const pageContent = await fetchPageContent(payload.pageId);
+  const validPageId = payload.pageId ? payload.pageId : payload.payload.pageId;
+  console.log(`Confluence Page ID: ${validPageId}`);
+  const pageContent = await fetchPageContent(validPageId);
 
   const query = pageContent;
 
